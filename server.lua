@@ -1,6 +1,7 @@
+local component = require "component"
 local event = require "event"
 local term = require "term"
-local m = (require "component").modem
+local modem
 
 function run()
 	local path = "/home/todolist.txt"
@@ -12,7 +13,7 @@ function run()
 		else
 			if msg and msg ~= "request-todo" then
 				print("server received invalid request")
-				m.send(from, port, "response-invalid-request")
+				modem.send(from, port, "response-invalid-request")
 			else
 				local fromShort = string.sub(from, 1,8)
 				print(string.format("received request-todo from %s", fromShort))
@@ -21,7 +22,7 @@ function run()
 					print(string.format("failed to open %s for reading: %s", path, err))
 					return
 				else
-					m.send(from, port, f:read("*all"))
+					modem.send(from, port, f:read("*all"))
 					f:close()
 					print(string.format("sent todolist to %s:%d", fromShort, port))
 				end
@@ -33,11 +34,14 @@ end
 function start()
 	term.clear()
 	local port = 4000
-	if not m then
-		print("failed to start todo-server: this computer lacks a network card.")
+	if not component.isAvailable("modem") then
+		print("failed to request todolist: this computer lacks a network card.")
+		print("press any key to continue...")
+		event.pull("key_down")
 		return
 	end
-	m.open(port)
+	modem = component.modem
+	modem.open(port)
 	print("started todolist-server; listening on port "..port)
 	run()
 end
