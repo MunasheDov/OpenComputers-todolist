@@ -7,9 +7,16 @@ local serialization = require "serialization"
 function loadServerList()
     if fs.exists("/home/serverlist.txt") then
         local file = io.open("/home/serverlist.txt", "r")
-        local serverList = serialization.unserialize(file:read("*all"))
+        local success, serverList = pcall(function()
+            return serialization.unserialize(file:read("*all"))
+        end)
         file:close()
-        return serverList
+        if success then
+            return serverList
+        else
+            print("Error loading server list: " .. serverList)
+            return {}
+        end
     else
         return {}
     end
@@ -17,8 +24,13 @@ end
 
 function saveServerList(serverList)
     local file = io.open("/home/serverlist.txt", "w")
-    file:write(serialization.serialize(serverList))
+    local success, err = pcall(function()
+        file:write(serialization.serialize(serverList))
+    end)
     file:close()
+    if not success then
+        print("Error saving server list: " .. err)
+    end
 end
 
 function start()
@@ -27,7 +39,7 @@ function start()
 
     print("Select a server address:")
     for i, server in ipairs(serverList) do
-        print(i .. ". " .. server)
+        print(i .. ". " .. tostring(server))  -- Ensure server is converted to string before printing
     end
     print("Enter a new server address or select a number from the list:")
 
@@ -44,10 +56,22 @@ function start()
         end
     else
         serverAddress = input
-        if not serverList[serverAddress] then
+        local found = false
+        for _, server in ipairs(serverList) do
+            if server == serverAddress then
+                found = true
+                break
+            end
+        end
+        if not found then
             table.insert(serverList, serverAddress)
             saveServerList(serverList)
         end
+    end
+
+    if type(serverAddress) ~= "string" then
+        print("Error: Server address must be a string.")
+        return
     end
 
     local port = 4000
@@ -59,13 +83,11 @@ function start()
     end
     local modem = component.modem
 
-    if not modem then
-        print("Failed to request todolist: this computer lacks a network card.")
-        return
-    end
-
-    if not modem.open(port) then
-        print("Failed to open port " .. port)
+    local success, err = pcall(function()
+        modem.open(port)
+    end)
+    if not success then
+        print("Failed to open port " .. port .. ": " .. err)
         return
     end
 
@@ -101,6 +123,15 @@ function start()
     print(horzLine)
     print("\n")
 
+    print("Press any key to continue...")
+    event.pull("key_down")
+    term.clear()
+end
+
+-- Call the start function within a pcall to catch any errors
+local success, err = pcall(start)
+if not success then
+    print("An error occurred: " .. err)
     print("Press any key to continue...")
     event.pull("key_down")
     term.clear()
